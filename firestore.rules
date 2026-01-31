@@ -1,0 +1,37 @@
+rules_version = '2';
+
+// =============================================================================
+// CTF Platform — Production Firestore Security Rules
+// =============================================================================
+//
+// Access model: BACKEND ONLY (Firebase Admin SDK).
+// The frontend never reads or writes Firestore directly. All data access goes
+// through the backend (Node.js + Firebase Admin SDK), which bypasses these
+// rules. These rules protect against accidental or malicious use of the
+// Firestore client SDK (e.g. in browser or mobile) and enforce zero client
+// access in production.
+//
+// Collections (backend-only; do not grant client access here):
+//   users           — profiles, MMR, rank, currentTeamId, banned, etc.
+//   teams           — team name, inviteCode, members, leader
+//   queues           — matchmaking queue entries
+//   matches          — match metadata, teamA/teamB, status
+//   online_users     — presence heartbeats
+//   challenges       — challenge requests and responses
+//   admin_events     — audit log (admin actions)
+//   system_config    — announcement, feature_flags, maintenance, etc.
+//   reports          — user-submitted reports
+//   seasons          — season config
+//   achievements     — achievement definitions
+//   user_achievements — user achievement assignments
+//
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Deny all client read/write. Only the backend (Admin SDK) can access data.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

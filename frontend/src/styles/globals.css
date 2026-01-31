@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+/* ========== CYBERPUNK DESIGN SYSTEM ========== */
+:root {
+  color-scheme: dark;
+
+  /* Backgrounds */
+  --bg-primary: #0A0F1C;
+  --bg-secondary: #0F1629;
+  --card-bg: #121A2F;
+  --border: #1E2A4A;
+
+  /* Neon palette */
+  --neon-cyan: #00E5FF;
+  --neon-purple: #7C4DFF;
+  --neon-red: #FF1744;
+  --neon-green: #00E676;
+
+  /* Semantic (admin / danger) */
+  --neon-amber: #FFAB00;
+  --text-primary: #E8EEF4;
+  --text-muted: #8B9BB0;
+  --text-dim: #5C6B80;
+
+  /* Glow */
+  --glow-cyan: rgba(0, 229, 255, 0.4);
+  --glow-purple: rgba(124, 77, 255, 0.4);
+  --glow-red: rgba(255, 23, 68, 0.4);
+  --glow-green: rgba(0, 230, 118, 0.4);
+
+  /* Aliases for consistency */
+  --success: var(--neon-green);
+  --warn: var(--neon-amber);
+  --danger: var(--neon-red);
+  --text: var(--text-primary);
+  --bg-elevated: var(--card-bg);
+  --bg-deep: var(--bg-primary);
+}
+
+body {
+  @apply antialiased;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: "Inter", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Typography */
+.font-heading {
+  font-family: "Orbitron", "Oxanium", ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-mono {
+  font-family: "JetBrains Mono", ui-monospace, "Cascadia Code", monospace;
+}
+
+/* Grid background */
+.bg-grid-cyber {
+  background-image:
+    linear-gradient(rgba(0, 229, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 229, 255, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Neon border glow */
+.neon-border-cyan {
+  box-shadow: 0 0 0 1px var(--border), 0 0 20px -2px var(--glow-cyan);
+}
+
+.neon-border-red {
+  box-shadow: 0 0 0 1px var(--border), 0 0 20px -2px var(--glow-red);
+}
+
+.neon-border-green {
+  box-shadow: 0 0 0 1px var(--border), 0 0 20px -2px var(--glow-green);
+}
+
+/* Glitch text clip */
+@keyframes glitch-skew {
+  0% { transform: skew(0deg); }
+  20% { transform: skew(-2deg, 2deg); }
+  40% { transform: skew(2deg, -2deg); }
+  60% { transform: skew(-1deg, 1deg); }
+  80% { transform: skew(1deg, -1deg); }
+  100% { transform: skew(0deg); }
+}
+
+@keyframes glitch-offset {
+  0%, 100% { transform: translate(0); }
+  33% { transform: translate(-2px, 2px); }
+  66% { transform: translate(2px, -2px); }
+}
+
+.glitch-hover:hover {
+  animation: glitch-skew 0.3s ease-in-out;
+}
+
+/* Pulse glow */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}

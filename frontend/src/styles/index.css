@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --bg-deep: #0a0e14;
+  --bg-card: #0d1117;
+  --bg-elevated: #161b22;
+  --border: #21262d;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --accent: #39c5cf;
+  --accent-dim: #238f96;
+  --glow: rgba(57, 197, 207, 0.15);
+  --success: #3fb950;
+  --warn: #d29922;
+  --danger: #f85149;
+}
+
+body {
+  @apply antialiased;
+  background: var(--bg-deep);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.font-mono {
+  font-family: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+}
+
+/* Techy card / panel */
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.3);
+}
+
+.panel-glow {
+  box-shadow: 0 0 24px var(--glow);
+}
+
+/* Subtle grid background */
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(57, 197, 207, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(57, 197, 207, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+}

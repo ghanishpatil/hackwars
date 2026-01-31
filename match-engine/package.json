@@ -1,0 +1,21 @@
+{
+  "name": "match-engine",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "src/engine.js",
+  "scripts": {
+    "start": "node src/engine.js",
+    "dev": "node --watch src/engine.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dockerode": "^4.0.9",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "node-fetch": "^3.3.2",
+    "winston": "^3.19.0"
+  }
+}
