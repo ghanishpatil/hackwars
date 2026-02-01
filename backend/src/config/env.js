@@ -28,22 +28,22 @@ const config = {
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET || '', // e.g. your-project.appspot.com
   },
   
-  // CORS: single frontend (player + admin share same app; role decides dashboard)
+  // CORS: CORS_ORIGINS = comma-separated list; CORS_ORIGIN = single origin (or comma-separated, we split both)
   cors: {
-    origin:
-      process.env.CORS_ORIGINS
-        ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
-        : [process.env.CORS_ORIGIN || 'http://localhost:5173'],
+    origin: (() => {
+      const list = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || 'http://localhost:5173';
+      return list.split(',').map((s) => s.trim()).filter(Boolean);
+    })(),
     credentials: true,
   },
 
   // Socket.IO (same origin as frontend)
   socket: {
     cors: {
-      origin:
-        process.env.CORS_ORIGINS
-          ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
-          : [process.env.CORS_ORIGIN || 'http://localhost:5173'],
+      origin: (() => {
+        const list = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || 'http://localhost:5173';
+        return list.split(',').map((s) => s.trim()).filter(Boolean);
+      })(),
       credentials: true,
     },
   },
