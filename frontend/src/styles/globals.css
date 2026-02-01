@@ -37,11 +37,23 @@
   --bg-deep: var(--bg-primary);
 }
 
+html {
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
 body {
   @apply antialiased;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow-x: hidden;
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: "Inter", "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+}
+
+#root {
+  min-height: 100%;
 }
 
 /* Typography */

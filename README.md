@@ -162,6 +162,7 @@ Each service has its own `.env.example` file. Copy to `.env` and fill in:
   - `FIREBASE_PROJECT_ID`
   - `FIREBASE_PRIVATE_KEY`
   - `FIREBASE_CLIENT_EMAIL`
+  - `FIREBASE_STORAGE_BUCKET` (optional) - Storage bucket for landing mission image uploads. Use the bucket name from Firebase Console → Storage (new projects often use `{projectId}.firebasestorage.app`).
 
 #### Match Engine (`match-engine/.env`)
 - `PORT` - Engine port (default: 7000)
@@ -214,6 +215,18 @@ Several **composite indexes** are required (queues, matches, teams, online_users
    Indexes can take a few minutes to build. After they are green in the [Firebase Console → Firestore → Indexes](https://console.firebase.google.com/), match history and other queries will work.
 
 - **Option B — From Console**: If you skip deploy and run the app, Firestore will return an error with a **link to create the missing index**. Open the link, create the index, wait for it to build, then re-run.
+
+#### Firebase Storage (landing mission images)
+
+Admin landing image uploads use **Firebase Storage**. You must:
+
+1. **Enable Storage** in [Firebase Console → Build → Storage](https://console.firebase.google.com/) → **Get started** (creates the default bucket).
+2. In **backend `.env`**, set **`FIREBASE_STORAGE_BUCKET`** to the bucket name shown in the Storage UI (e.g. `csbc-wg.firebasestorage.app` for new projects, or `your-project.appspot.com` for legacy).
+3. Deploy Storage rules so landing images are publicly readable:
+
+   ```bash
+   firebase deploy --only storage
+   ```
 
 ---
 

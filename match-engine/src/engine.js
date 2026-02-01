@@ -18,9 +18,12 @@ import {
   recordFlagCapture,
   isFlagCaptured,
   getAllMatches,
+  getMatchInfrastructure,
 } from './state/stateStore.js';
 import { validateFlag } from './flags/flagManager.js';
 import { onFlagCaptured } from './scoring/scorer.js';
+import { provisionMatch } from './services/matchProvisioner.js';
+import { cleanupMatch, cleanupStaleMatches } from './services/matchCleanup.js';
 
 dotenv.config();
 
@@ -64,6 +67,51 @@ app.use(express.json({ limit: '50kb' }));
 // Health endpoint (no auth; used by backend/admin)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'match-engine' });
+});
+
+/**
+ * POST /engine/match/provision
+ *
+ * Body: { matchId, difficulty, teamA: { teamId, players }, teamB: { teamId, players } }
+ * Fetches default collection from backend, creates network + containers, injects flags.
+ */
+app.post('/engine/match/provision', async (req, res) => {
+  try {
+    const infrastructure = await provisionMatch(req.body || {});
+    res.json({ success: true, infrastructure });
+  } catch (err) {
+    console.error('[ENGINE] Provision failed:', err);
+    res.status(500).json({
+      error: 'Provisioning failed',
+      details: err.message,
+    });
+  }
+});
+
+/**
+ * POST /engine/match/:matchId/cleanup
+ */
+app.post('/engine/match/:matchId/cleanup', async (req, res) => {
+  try {
+    const { matchId } = req.params;
+    await cleanupMatch(matchId);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[ENGINE] Cleanup failed:', err);
+    res.status(500).json({ error: 'Cleanup failed' });
+  }
+});
+
+/**
+ * GET /engine/match/:matchId/infrastructure
+ */
+app.get('/engine/match/:matchId/infrastructure', (req, res) => {
+  const { matchId } = req.params;
+  const infrastructure = getMatchInfrastructure(matchId);
+  if (!infrastructure) {
+    return res.status(404).json({ error: 'Infrastructure not found' });
+  }
+  res.json({ success: true, infrastructure });
 });
 
 /**
@@ -244,6 +292,20 @@ app.get('/engine/match/:matchId/result', (req, res) => {
   return res.status(200).json(result);
 });
 
+// Stale match cleanup: every 30 minutes
+const STALE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
+let staleCleanupInterval = null;
+
+function startStaleCleanupCron() {
+  if (staleCleanupInterval) return;
+  staleCleanupInterval = setInterval(() => {
+    cleanupStaleMatches().catch((err) => {
+      console.error('[ENGINE] Stale cleanup failed:', err.message);
+    });
+  }, STALE_CLEANUP_INTERVAL_MS);
+  console.log('[ENGINE] Stale cleanup cron started (every 30 min)');
+}
+
 // Run recovery on boot, then start safety cron, then listen
 async function start() {
   try {
@@ -253,6 +315,7 @@ async function start() {
     process.exitCode = 1;
   }
   startSafetyCron();
+  startStaleCleanupCron();
   app.listen(PORT, () => {
     console.log(`Match Engine listening on port ${PORT}`);
   });

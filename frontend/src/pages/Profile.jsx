@@ -80,7 +80,7 @@ export default function Profile() {
   const track = profile?.track ?? '—';
 
   return (
-    <div className="space-y-8">
+    <div className="w-full max-w-full min-w-0 space-y-6 sm:space-y-8">
       <motion.h1
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}

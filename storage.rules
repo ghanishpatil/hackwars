@@ -1,0 +1,10 @@
+rules_version = '2';
+// Landing mission images: public read. Writes are done server-side (Firebase Admin).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /landing-missions/{missionId}/{fileName} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

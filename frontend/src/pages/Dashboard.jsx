@@ -68,13 +68,13 @@ export default function Dashboard() {
   const displayName = profile?.displayName ?? profile?.username ?? 'Player';
 
   return (
-    <div className="space-y-8">
+    <div className="w-full max-w-full min-w-0 space-y-6 sm:space-y-8">
       <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}>
         <p className="font-mono text-sm text-[var(--text-muted)] mb-1">Welcome back</p>
         <h1 className="font-heading text-2xl sm:text-3xl font-bold text-[var(--text-primary)]">{displayName}</h1>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <NeonCard glow="cyan" className="p-6">
             <p className="text-xs font-mono text-[var(--text-muted)] uppercase tracking-wider mb-1">Rank</p>

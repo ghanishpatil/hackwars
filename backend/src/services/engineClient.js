@@ -17,14 +17,16 @@ import fetch from 'node-fetch';
 
 const DEFAULT_BASE_URL = 'http://localhost:7000';
 const REQUEST_TIMEOUT_MS = 5_000;
+const PROVISION_TIMEOUT_MS = 5 * 60 * 1000; // 5 min for provision (pull + start)
 
 function getBaseUrl() {
   return process.env.MATCH_ENGINE_URL || DEFAULT_BASE_URL;
 }
 
-async function request(method, path, body) {
+async function request(method, path, body, options = {}) {
+  const timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch(`${getBaseUrl()}${path}`, {
@@ -120,6 +122,36 @@ export async function getMatchResult(matchId) {
     'GET',
     `/engine/match/${encodeURIComponent(matchId)}/result`
   );
+}
+
+/**
+ * Provision a match (Phase 2): network + containers from service templates, inject flags.
+ *
+ * @param {{ matchId: string; difficulty: string; teamA: { teamId: string; players?: any[] }; teamB: { teamId: string; players?: any[] } }} matchData
+ * @returns {Promise<{ success: boolean; infrastructure: object }>}
+ */
+export async function provisionMatch(matchData) {
+  return request('POST', '/engine/match/provision', matchData, { timeoutMs: PROVISION_TIMEOUT_MS });
+}
+
+/**
+ * Clean up a match (containers + network).
+ *
+ * @param {string} matchId
+ * @returns {Promise<{ success: boolean }>}
+ */
+export async function cleanupMatch(matchId) {
+  return request('POST', `/engine/match/${encodeURIComponent(matchId)}/cleanup`);
+}
+
+/**
+ * Get match infrastructure (containers, network). Phase 2.
+ *
+ * @param {string} matchId
+ * @returns {Promise<{ success: boolean; infrastructure: object }>}
+ */
+export async function getMatchInfrastructure(matchId) {
+  return request('GET', `/engine/match/${encodeURIComponent(matchId)}/infrastructure`);
 }
 
 /**

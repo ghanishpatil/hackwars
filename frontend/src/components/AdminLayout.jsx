@@ -31,10 +31,10 @@ export function AdminLayout() {
   }, [fetchStatus]);
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] bg-grid-cyber">
+    <div className="min-h-screen w-full max-w-[100vw] overflow-x-hidden bg-[var(--bg-primary)] bg-grid-cyber">
       <AdminHeader engineStatus={engineStatus} />
       <AdminNav />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+      <main className="w-full max-w-[100vw] max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 pb-12 sm:pb-16 box-border">
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}

@@ -1,11 +1,22 @@
 /**
- * Public routes: no auth required. Used by frontend for announcement banner, feature flags, leaderboard.
+ * Public routes: no auth required. Used by frontend for announcement banner, feature flags, leaderboard, landing missions.
  */
 
 import express from 'express';
 import { getAnnouncement, getFeatureFlags, getPublicLeaderboard } from '../services/adminFeaturesService.js';
+import { getLandingMissions } from '../services/landingMissionsService.js';
 
 const router = express.Router();
+
+/** GET /landing/missions — landing page Mission Exploit / 2.0 (photos + info) */
+router.get('/landing/missions', async (req, res) => {
+  try {
+    const data = await getLandingMissions();
+    return res.json(data);
+  } catch (err) {
+    return res.status(500).json([]);
+  }
+});
 
 /** GET /announcement — current global announcement (for banner) */
 router.get('/announcement', async (req, res) => {

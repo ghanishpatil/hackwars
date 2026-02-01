@@ -56,6 +56,18 @@ import {
   getMaintenanceConfig,
   setMaintenanceEndTime,
 } from '../services/adminFeaturesService.js';
+import multer from 'multer';
+import { updateLandingMission, uploadLandingMissionImage } from '../services/landingMissionsService.js';
+import {
+  listServiceCollections,
+  createServiceCollection,
+  setDefaultCollection,
+} from '../services/serviceCollectionService.js';
+
+const uploadLandingImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+}).single('image');
 
 const router = express.Router();
 
@@ -606,6 +618,74 @@ router.patch('/maintenance/end-time', async (req, res) => {
     return res.json(data);
   } catch (err) {
     return res.status(500).json({ error: 'Failed to set end time' });
+  }
+});
+
+// ——— Service Collections (default sets for match provisioning) ———
+router.get('/service-collections', async (req, res) => {
+  try {
+    const difficulty = req.query.difficulty;
+    const filters = difficulty ? { difficulty } : {};
+    const collections = await listServiceCollections(filters);
+    return res.json(collections);
+  } catch (err) {
+    return res.status(500).json({ error: 'Failed to list service collections' });
+  }
+});
+
+router.post('/service-collections', async (req, res) => {
+  try {
+    const adminId = req.user?.uid;
+    const collection = await createServiceCollection(adminId, req.body || {});
+    return res.json(collection);
+  } catch (err) {
+    if (err.message === 'INVALID_INPUT') return res.status(400).json({ error: 'Invalid input: name, difficulty, and exactly 5 template IDs required' });
+    return res.status(500).json({ error: err.message || 'Failed to create collection' });
+  }
+});
+
+router.patch('/service-collections/:id/default', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const collection = await setDefaultCollection(id);
+    return res.json(collection);
+  } catch (err) {
+    if (err.message === 'NOT_FOUND') return res.status(404).json({ error: 'Collection not found' });
+    return res.status(500).json({ error: err.message || 'Failed to set default' });
+  }
+});
+
+// ——— Landing page (Mission Exploit / 2.0 photos + info) ———
+router.patch('/landing/missions/:id', async (req, res) => {
+  try {
+    const adminId = req.user?.uid;
+    const { id } = req.params;
+    const data = await updateLandingMission(id, req.body || {});
+    return res.json(data);
+  } catch (err) {
+    const status = err.message?.includes('Invalid') ? 400 : 500;
+    return res.status(status).json({ error: err.message || 'Failed to update landing mission' });
+  }
+});
+
+/** POST /admin/landing/missions/:id/upload — upload image file; returns { url }. */
+router.post('/landing/missions/:id/upload', (req, res, next) => {
+  uploadLandingImage(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'Image too large. Max 5MB.' });
+      return res.status(400).json({ error: err.message || 'Upload failed' });
+    }
+    next();
+  });
+}, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!req.file || !req.file.buffer) return res.status(400).json({ error: 'No image file provided' });
+    const { url } = await uploadLandingMissionImage(id, req.file.buffer, req.file.mimetype, req.file.originalname);
+    return res.json({ url });
+  } catch (err) {
+    const status = err.message?.includes('Invalid') ? 400 : 500;
+    return res.status(status).json({ error: err.message || 'Upload failed' });
   }
 });
 

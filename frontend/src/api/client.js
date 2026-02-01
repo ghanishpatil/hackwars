@@ -16,12 +16,10 @@ export function clearApiToken() {
 }
 
 async function request(path, options = {}) {
-  const headers = {
-    'Content-Type': 'application/json',
-    ...options.headers,
-  };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  const headers = { ...options.headers };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (headers['Content-Type'] === undefined && !(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
   }
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
   const data = await res.json().catch(() => ({}));
@@ -61,6 +59,7 @@ export const api = {
   getAnnouncement: () => requestPublic('/api/announcement'),
   getFeatureFlags: () => requestPublic('/api/feature-flags'),
   getLeaderboard: (limit) => requestPublic(`/api/leaderboard?limit=${limit ?? 50}`),
+  getLandingMissions: () => requestPublic('/api/landing/missions'),
   getMatchHistory: () => request('/match/history'),
   report: (body) => request('/report', { method: 'POST', body: JSON.stringify(body) }),
   teams: {
@@ -135,4 +134,31 @@ export const adminApi = {
   getMaintenanceConfig: () => request('/admin/maintenance/config'),
   setMaintenanceEndTime: (endTime) => request('/admin/maintenance/end-time', { method: 'PATCH', body: JSON.stringify({ endTime }) }),
   broadcast: (message) => request('/admin/broadcast', { method: 'POST', body: JSON.stringify({ message }) }),
+  getLandingMissions: () => requestPublic('/api/landing/missions'),
+  updateLandingMission: (id, body) => request(`/admin/landing/missions/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  /** Upload image file; returns { url }. */
+  uploadLandingMissionImage: (missionId, file) => {
+    const form = new FormData();
+    form.append('image', file);
+    return request(`/admin/landing/missions/${missionId}/upload`, { method: 'POST', body: form });
+  },
+  // Service Templates (Phase 1)
+  getServiceTemplates: (params) =>
+    request(`/api/service-templates?${new URLSearchParams(params || {}).toString()}`),
+  getServiceTemplate: (id) => request(`/api/service-templates/${id}`),
+  createServiceTemplate: (body) =>
+    request('/api/service-templates', { method: 'POST', body: JSON.stringify(body) }),
+  updateServiceTemplate: (id, body) =>
+    request(`/api/service-templates/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteServiceTemplate: (id) =>
+    request(`/api/service-templates/${id}`, { method: 'DELETE' }),
+  uploadDockerfile: (formData) =>
+    request('/api/service-templates/upload-dockerfile', { method: 'POST', body: formData }),
+  // Service Collections (for match provisioning)
+  getServiceCollections: (params) =>
+    request(`/admin/service-collections?${new URLSearchParams(params || {}).toString()}`),
+  createServiceCollection: (body) =>
+    request('/admin/service-collections', { method: 'POST', body: JSON.stringify(body) }),
+  setDefaultServiceCollection: (id) =>
+    request(`/admin/service-collections/${id}/default`, { method: 'PATCH' }),
 };

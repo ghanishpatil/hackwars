@@ -43,7 +43,7 @@ export function LogoAnimation({ className = '', lottieJson = null }) {
         animate={{ opacity: [0.8, 1, 0.8] }}
         transition={{ duration: 2, repeat: Infinity }}
       >
-        CTF_WAR
+        Hackwars
       </motion.span>
     </motion.div>
   );

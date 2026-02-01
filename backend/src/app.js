@@ -21,6 +21,9 @@ import reportRoutes from './routes/report.js';
 import teamsRoutes from './routes/teams.js';
 import presenceRoutes from './routes/presence.js';
 import challengesRoutes from './routes/challenges.js';
+import serviceTemplatesRoutes from './routes/serviceTemplates.js';
+import engineApiRoutes from './routes/engineApi.js';
+import { adminGuard } from './middleware/adminGuard.js';
 
 const app = express();
 
@@ -47,6 +50,8 @@ app.use('/report', authLimit, reportRoutes); // POST /report (authenticated)
 app.use('/teams', authLimit, teamsRoutes);   // POST /teams/create, /join, /leave, DELETE /:id/disband, GET /:id
 app.use('/presence', queueLimit, presenceRoutes); // POST /presence/heartbeat, GET /presence/online
 app.use('/challenges', authLimit, challengesRoutes); // POST /challenges/send, POST /:id/respond, GET /received, /sent
+app.use('/api/service-templates', adminGuard, serviceTemplatesRoutes); // Admin: service template CRUD + dockerfile upload
+app.use('/api/match', engineApiRoutes); // Engine: default-collection, infrastructure (internal)
 
 // 404 handler
 app.use((req, res) => {

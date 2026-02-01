@@ -24,6 +24,7 @@ rules_version = '2';
 //   seasons          — season config
 //   achievements     — achievement definitions
 //   user_achievements — user achievement assignments
+//   landing_missions  — Mission Exploit / 2.0 photos + info (landing page; read via API, updated by admin)
 //
 // =============================================================================
 

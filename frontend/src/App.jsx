@@ -20,6 +20,9 @@ import AdminUserActivity from './admin/AdminUserActivity';
 import AdminAudit from './admin/AdminAudit';
 import AdminReports from './admin/AdminReports';
 import AdminSystem from './admin/AdminSystem';
+import AdminLanding from './admin/AdminLanding';
+import AdminServiceTemplates from './admin/AdminServiceTemplates';
+import AdminServiceCollections from './admin/AdminServiceCollections';
 import './styles/globals.css';
 
 function RequireAuth({ children }) {
@@ -73,6 +76,9 @@ function App() {
           <Route path="activity" element={<AdminUserActivity />} />
           <Route path="audit" element={<AdminAudit />} />
           <Route path="reports" element={<AdminReports />} />
+          <Route path="landing" element={<AdminLanding />} />
+          <Route path="service-templates" element={<AdminServiceTemplates />} />
+          <Route path="service-collections" element={<AdminServiceCollections />} />
           <Route path="system" element={<AdminSystem />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

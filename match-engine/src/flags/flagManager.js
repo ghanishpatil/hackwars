@@ -6,6 +6,7 @@
  */
 
 import crypto from 'crypto';
+import { getServiceIdsFromInfrastructure } from '../state/stateStore.js';
 
 const FLAG_PREFIX = 'FLAG{';
 const FLAG_SUFFIX = '}';
@@ -95,11 +96,14 @@ function parseFlagFormat(flag) {
 
 /**
  * Get service IDs for a match (canonical list used for validation).
+ * Uses infrastructure when available (provisioned matches); else legacy 2-service ids.
  *
  * @param {string} matchId
  * @returns {string[]}
  */
 export function getServiceIdsForMatch(matchId) {
+  const fromInfra = getServiceIdsFromInfrastructure(matchId);
+  if (fromInfra && fromInfra.length > 0) return fromInfra;
   return [`teamA_${matchId}`, `teamB_${matchId}`];
 }
 

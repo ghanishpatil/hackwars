@@ -65,12 +65,12 @@ export default function Signup() {
   const labelClass = 'block text-xs font-medium text-[var(--text-muted)] mb-2 font-mono';
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] bg-grid-cyber flex items-center justify-center px-4 py-12">
+    <div className="min-h-screen min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden bg-[var(--bg-primary)] bg-grid-cyber flex flex-col items-center justify-center px-4 sm:px-6 pt-14 sm:pt-16 pb-8 sm:pb-12">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-md"
+        transition={{ duration: 0.45, ease: 'easeOut' }}
+        className="w-full max-w-md mx-auto shrink-0"
       >
         <NeonCard glow="purple" className="p-8">
           <h1 className="font-heading text-2xl font-bold text-[var(--neon-purple)] mb-2">

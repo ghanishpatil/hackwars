@@ -265,14 +265,14 @@ export async function transitionToInitializing(matchId) {
     updateState(matchId, MatchState.INITIALIZING);
 
     // Create Docker network
-    const networkId = await createMatchNetwork(matchId);
+    const network = await createMatchNetwork(matchId);
 
-    // Start containers
-    const containerIds = await startMatchContainers(matchId, networkId);
+    // Start containers (networkName for NetworkMode)
+    const containerIds = await startMatchContainers(matchId, network.networkName);
 
     // Store container IDs and network ID in metadata
     updateMetadata(matchId, {
-      networkId,
+      networkId: network.networkId,
       containerIds,
     });
 

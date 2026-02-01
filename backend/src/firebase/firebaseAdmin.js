@@ -30,13 +30,17 @@ function initializeFirebaseAdmin() {
   }
 
   try {
-    firebaseAdmin = admin.initializeApp({
+    const appOptions = {
       credential: admin.credential.cert({
         projectId: config.firebase.projectId,
         privateKey: config.firebase.privateKey,
         clientEmail: config.firebase.clientEmail,
       }),
-    });
+    };
+    if (config.firebase.storageBucket) {
+      appOptions.storageBucket = config.firebase.storageBucket;
+    }
+    firebaseAdmin = admin.initializeApp(appOptions);
 
     console.log('Firebase Admin SDK initialized successfully');
     return firebaseAdmin;
@@ -76,6 +80,16 @@ export function getFirestore() {
 export function getAuth() {
   const app = getFirebaseAdmin();
   return app ? app.auth() : null;
+}
+
+/**
+ * Get Storage instance (for landing mission image uploads, etc.)
+ *
+ * @returns {admin.storage.Storage | null} Storage instance or null
+ */
+export function getStorage() {
+  const app = getFirebaseAdmin();
+  return app ? app.storage() : null;
 }
 
 // Convenience exports (as required):

@@ -46,12 +46,12 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] bg-grid-cyber flex items-center justify-center px-4 py-24">
+    <div className="min-h-screen min-h-[100dvh] w-full max-w-[100vw] overflow-x-hidden bg-[var(--bg-primary)] bg-grid-cyber flex flex-col items-center justify-center px-4 sm:px-6 pt-14 sm:pt-16 pb-8 sm:pb-12">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-md"
+        transition={{ duration: 0.45, ease: 'easeOut' }}
+        className="w-full max-w-md mx-auto shrink-0"
       >
         {bannedMessage && (
           <NeonCard glow="red" className="p-4 mb-4">

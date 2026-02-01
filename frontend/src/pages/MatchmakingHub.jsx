@@ -187,12 +187,12 @@ export default function MatchmakingHub() {
   const canQueueTeam = mode === 'team' && team && team.currentSize >= teamSize;
 
   return (
-    <div className="space-y-6">
+    <div className="w-full max-w-full min-w-0 space-y-4 sm:space-y-6">
       {/* Top bar */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-wrap items-center justify-between gap-4"
+        className="flex flex-wrap items-center justify-between gap-2 sm:gap-4"
       >
         <div className="flex items-center gap-4">
           {team ? (
@@ -213,7 +213,7 @@ export default function MatchmakingHub() {
         <span className="font-mono text-sm text-[var(--neon-cyan)]">{online.onlineCount} online</span>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Left: settings */}
         <motion.div
           initial={{ opacity: 0, x: -10 }}

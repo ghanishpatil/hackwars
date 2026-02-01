@@ -410,3 +410,54 @@ export function getAllMatches() {
   return matchStates;
 }
 
+// ——— Match infrastructure (Phase 2: provisioned containers + network) ———
+const matchInfrastructure = new Map();
+
+/**
+ * Store infrastructure for a match (network + team containers).
+ *
+ * @param {string} matchId
+ * @param {object} infrastructure — { matchId, networkId, subnet, teamA: { teamId, containers }, teamB: { teamId, containers }, provisionedAt }
+ */
+export function setMatchInfrastructure(matchId, infrastructure) {
+  matchInfrastructure.set(matchId, infrastructure);
+}
+
+/**
+ * Get infrastructure for a match.
+ *
+ * @param {string} matchId
+ * @returns {object | null}
+ */
+export function getMatchInfrastructure(matchId) {
+  return matchInfrastructure.get(matchId) || null;
+}
+
+/**
+ * Remove infrastructure from store (after cleanup).
+ *
+ * @param {string} matchId
+ */
+export function deleteMatchInfrastructure(matchId) {
+  matchInfrastructure.delete(matchId);
+}
+
+/**
+ * Get list of service IDs for a match (from infrastructure). Used by flag validation.
+ *
+ * @param {string} matchId
+ * @returns {string[] | null} Array of serviceIds or null if no infrastructure
+ */
+export function getServiceIdsFromInfrastructure(matchId) {
+  const infra = matchInfrastructure.get(matchId);
+  if (!infra) return null;
+  const ids = [];
+  for (const c of infra.teamA?.containers || []) {
+    if (c.serviceId) ids.push(c.serviceId);
+  }
+  for (const c of infra.teamB?.containers || []) {
+    if (c.serviceId) ids.push(c.serviceId);
+  }
+  return ids.length ? ids : null;
+}
+
