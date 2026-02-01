@@ -40,6 +40,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', service: 'backend' });
 });
 
+// Root route — so visiting the deployed URL shows OK (Render and browsers)
+app.get('/', (req, res) => {
+  res.json({ service: 'backend', status: 'ok', health: '/health' });
+});
+
 // API Routes — rate limits: auth strict, queue moderate; admin not limited
 app.use('/auth', authLimit, authRoutes);
 app.use('/queue', queueLimit, queueRoutes);
