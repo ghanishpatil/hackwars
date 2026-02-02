@@ -1,17 +1,31 @@
 /**
  * Firebase client init from env. Used for Auth only.
+ * Validates environment variables before initialization.
  */
 
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { validateEnvironment, getConfig } from '../utils/validateEnv.js';
+
+// Validate environment variables
+try {
+  validateEnvironment();
+} catch (err) {
+  console.error('Firebase configuration error:');
+  console.error(err.message);
+  throw err;
+}
+
+// Get validated config
+const config = getConfig();
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: config.firebase.apiKey,
+  authDomain: config.firebase.authDomain,
+  projectId: config.firebase.projectId,
+  storageBucket: config.firebase.storageBucket,
+  messagingSenderId: config.firebase.messagingSenderId,
+  appId: config.firebase.appId,
 };
 
 const app = initializeApp(firebaseConfig);

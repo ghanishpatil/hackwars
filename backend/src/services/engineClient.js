@@ -29,11 +29,19 @@ async function request(method, path, body, options = {}) {
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    const headers = {
+      'Content-Type': 'application/json',
+    };
+
+    // Add authentication header if secret is configured
+    const secret = process.env.MATCH_ENGINE_SECRET;
+    if (secret) {
+      headers['Authorization'] = `Bearer ${secret}`;
+    }
+
     const res = await fetch(`${getBaseUrl()}${path}`, {
       method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       body: body ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });

@@ -49,8 +49,37 @@ export async function provisionTeamServices(matchId, teamId, networkId, serviceT
         ExposedPorts: { [`${port}/tcp`]: {} },
         HostConfig: {
           NetworkMode: networkNameOrId,
+
+          // Memory limits (512MB hard limit, no swap)
           Memory: 512 * 1024 * 1024,
+          MemorySwap: 512 * 1024 * 1024, // Same as Memory = no swap
+          MemoryReservation: 256 * 1024 * 1024, // Soft limit
+
+          // CPU limits (50% of one CPU core)
+          CpuQuota: 50000, // 50% of 100000 (one core)
+          CpuPeriod: 100000,
+          CpuShares: 512, // Relative weight
+
+          // Process limits (prevent fork bombs)
+          PidsLimit: 100,
+
+          // Security options
+          SecurityOpt: [
+            'no-new-privileges', // Prevent privilege escalation
+          ],
+
+          // Restart policy
           RestartPolicy: { Name: 'on-failure', MaximumRetryCount: 3 },
+
+          // Read-only root filesystem (commented out - may break some services)
+          // ReadonlyRootfs: true,
+
+          // Disable privileged mode explicitly
+          Privileged: false,
+
+          // Drop all capabilities, add only what's needed
+          CapDrop: ['ALL'],
+          // CapAdd: ['NET_BIND_SERVICE'], // Uncomment if services need to bind to ports < 1024
         },
         Labels: {
           'ctf.match.id': matchId,

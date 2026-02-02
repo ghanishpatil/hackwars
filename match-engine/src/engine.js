@@ -4,10 +4,14 @@
  * Data plane: Docker lifecycle, health checks, flag validation, scoring.
  * All admin/control flows go Backend → Engine. Engine never exposes ports to public (nginx).
  * FLAG_SECRET and flags are never logged.
+ * 
+ * SECURITY: All endpoints (except /health) require authentication via shared secret.
  */
 
 import dotenv from 'dotenv';
 import express from 'express';
+import { authenticateEngine } from './middleware/engineAuth.js';
+import logger from './utils/logger.js';
 import { MatchState, transitionToInitializing, transitionToEnded, getMatchResult } from './lifecycle/matchLifecycle.js';
 import { runRecovery } from './lifecycle/recovery.js';
 import { startSafetyCron } from './lifecycle/safetyCron.js';
@@ -69,6 +73,9 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'match-engine' });
 });
 
+// Apply authentication to all other endpoints
+app.use(authenticateEngine);
+
 /**
  * POST /engine/match/provision
  *
@@ -80,10 +87,10 @@ app.post('/engine/match/provision', async (req, res) => {
     const infrastructure = await provisionMatch(req.body || {});
     res.json({ success: true, infrastructure });
   } catch (err) {
-    console.error('[ENGINE] Provision failed:', err);
+    logger.error('[ENGINE] Provision failed:', { error: err.message, stack: err.stack });
     res.status(500).json({
       error: 'Provisioning failed',
-      details: err.message,
+      // Don't expose internal details to client
     });
   }
 });
@@ -97,7 +104,7 @@ app.post('/engine/match/:matchId/cleanup', async (req, res) => {
     await cleanupMatch(matchId);
     res.json({ success: true });
   } catch (err) {
-    console.error('[ENGINE] Cleanup failed:', err);
+    logger.error('[ENGINE] Cleanup failed:', { matchId, error: err.message });
     res.status(500).json({ error: 'Cleanup failed' });
   }
 });

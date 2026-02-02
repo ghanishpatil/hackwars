@@ -174,6 +174,266 @@ nginx -t && systemctl reload nginx
 
 Use **Option B** URL as `MATCH_ENGINE_URL` in the backend.
 
+### 2.6 Deploy match engine on your own server (detailed)
+
+You can run the **match engine** on your own PC or home server (Windows, macOS, or Linux) instead of a cloud VPS. The backend (e.g. on Render) must be able to reach this engine over the internet.
+
+---
+
+#### Requirements (own server)
+
+| Requirement | Details |
+|-------------|---------|
+| **OS** | Windows 10/11, macOS, or Linux (e.g. Ubuntu 22.04). |
+| **Docker** | Must be installed and running. The engine uses Docker to create match networks and containers. |
+| **Node.js** | v20 LTS or newer. |
+| **RAM** | 4 GB+ recommended (each match runs multiple containers). |
+| **Network** | A way for the cloud backend to reach your machine: **public IP + port forward**, or a **tunnel** (ngrok / Cloudflare Tunnel). |
+
+---
+
+#### Step 1: Install Docker and Node.js
+
+**Windows**
+
+1. Install [Docker Desktop](https://www.docker.com/products/docker-desktop/). Start Docker Desktop and ensure it is running (whale icon in system tray).
+2. Install Node 20 LTS from [nodejs.org](https://nodejs.org/) (LTS), or with `winget install OpenJS.NodeJS.LTS`.
+
+**macOS**
+
+```bash
+# Docker
+# Download Docker Desktop from https://www.docker.com/products/docker-desktop/ and install. Start the app.
+
+# Node 20 (with Homebrew)
+brew install node@20
+brew link --overwrite node@20
+```
+
+**Linux (e.g. Ubuntu 22.04)**
+
+```bash
+# Docker
+curl -fsSL https://get.docker.com | sudo sh
+sudo systemctl enable docker
+sudo systemctl start docker
+sudo usermod -aG docker $USER   # then log out and back in
+
+# Node 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
+```
+
+Verify:
+
+```bash
+docker --version
+node --version   # should be v20.x
+```
+
+---
+
+#### Step 2: Get the code and install dependencies
+
+On your server (or PC):
+
+```bash
+# Clone the repo (replace with your repo URL)
+git clone https://github.com/YOUR_USER/YOUR_REPO.git
+cd YOUR_REPO/match-engine
+
+# Install Node dependencies
+npm install
+```
+
+If you already have the repo, just pull and install:
+
+```bash
+cd /path/to/your/repo/match-engine
+git pull
+npm install
+```
+
+---
+
+#### Step 3: Configure environment (`.env`)
+
+Create a `.env` file in the `match-engine` folder (copy from `.env.example`):
+
+```bash
+cp .env.example .env
+# Then edit .env with your values (see below)
+```
+
+**Variables explained:**
+
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `PORT` | Yes | Port the engine HTTP server listens on. | `7000` |
+| `NODE_ENV` | Yes | Use `production` on a real server. | `production` |
+| `BACKEND_URL` | Yes | Full URL of your backend (Render). The engine calls this to fetch default service collections and to push match infrastructure. | `https://ctf-backend.onrender.com` |
+| `FLAG_SECRET` | Yes | Secret used for HMAC/signing of flags. Generate a long random string; **must match** what the backend uses for the same matches. | e.g. 32+ random chars |
+| `MAX_CONCURRENT_MATCHES` | No | Max number of matches at once; engine rejects new ones above this. | `50` |
+| `FLAG_SUBMIT_RATE_MAX` | No | Max flag submissions per window (rate limit). | `30` |
+| `MAX_CONTAINER_AGE_HOURS` | No | Containers older than this are cleaned up by the safety cron. | `4` |
+| `MAX_MATCH_DURATION_HOURS` | No | Matches older than this are considered stale for cleanup. | `3` |
+
+**Example `.env` (backend on Render):**
+
+```env
+PORT=7000
+NODE_ENV=production
+BACKEND_URL=https://ctf-backend.onrender.com
+FLAG_SECRET=your-long-random-secret-at-least-32-chars
+MAX_CONCURRENT_MATCHES=50
+FLAG_SUBMIT_RATE_MAX=30
+MAX_CONTAINER_AGE_HOURS=4
+MAX_MATCH_DURATION_HOURS=3
+```
+
+**Important:** The backend must use the **same** `FLAG_SECRET` (or equivalent) when generating/validating flags for matches that this engine provisions; otherwise scoring will not align.
+
+---
+
+#### Step 4: Run the match engine
+
+**Quick run (foreground, for testing):**
+
+```bash
+node src/engine.js
+```
+
+You should see the server listening on `PORT` (e.g. `7000`). Stop with `Ctrl+C`.
+
+**Run in background and survive reboots (recommended):**
+
+- **Linux / macOS:** use PM2.
+
+  ```bash
+  sudo npm install -g pm2
+  pm2 start src/engine.js --name match-engine
+  pm2 save
+  pm2 startup
+  # Run the command that pm2 startup prints (e.g. sudo env PATH=... pm2 startup)
+  ```
+
+  Useful: `pm2 status`, `pm2 logs match-engine`, `pm2 restart match-engine`.
+
+- **Windows:** run as a service or use a process manager. For a simple “run in background” option you can use `pm2` (install via npm and run in the same way), or run `node src/engine.js` inside a terminal that stays open / under a Windows service wrapper.
+
+After this step, the engine is reachable **only on this machine** at `http://localhost:7000`. Next, expose it so the backend on the internet can call it.
+
+---
+
+#### Step 5: Expose the engine so the backend can reach it
+
+The backend (e.g. on Render) needs a **public URL** for the match engine. Choose one of the following.
+
+---
+
+**Option A: Port forwarding (you have a public IP)**
+
+1. **Find your machine’s local IP** (e.g. `192.168.1.100`):  
+   - Windows: `ipconfig`  
+   - macOS/Linux: `ip addr` or `ifconfig`
+2. **Router:** Log in to your router (often `192.168.1.1` or `192.168.0.1`). Find **Port Forwarding** / **Virtual Server** / **NAT**.
+3. **Add a rule:**  
+   - External port: `7000` (TCP)  
+   - Internal IP: your PC’s IP (e.g. `192.168.1.100`)  
+   - Internal port: `7000`  
+   Save.
+4. **Public IP:** Check [whatismyip.com](https://www.whatismyip.com/) or similar. If your ISP gives you a **dynamic** IP, it can change; use a **DDNS** hostname (e.g. No-IP, DuckDNS) and point it to your public IP, then use that hostname instead of the raw IP.
+5. **Firewall:** On the PC, allow inbound TCP port `7000` (Windows Firewall / `ufw` on Linux).
+6. **Engine URL:**  
+   `http://YOUR_PUBLIC_IP:7000` or `http://YOUR_DDNS_HOSTNAME:7000`  
+   Use this as `MATCH_ENGINE_URL` in the backend (Render).
+
+---
+
+**Option B: ngrok (no port forwarding, good for dev / home)**
+
+1. Sign up at [ngrok.com](https://ngrok.com) and get your auth token.
+2. Install ngrok:  
+   - [Download](https://ngrok.com/download) for your OS, or  
+   - macOS: `brew install ngrok`  
+   - Windows: `winget install ngrok.ngrok` or use the installer from the site.
+3. Configure auth (once):  
+   `ngrok config add-authtoken YOUR_TOKEN`
+4. Start the match engine (Step 4), then in another terminal:  
+   `ngrok http 7000`
+5. ngrok will print a **Forwarding** URL, e.g. `https://abc123.ngrok-free.app`.  
+   **Use this exact URL** as `MATCH_ENGINE_URL` in the backend (Render).
+6. **Limitation (free tier):** The URL changes each time you restart ngrok. After each restart, update `MATCH_ENGINE_URL` in Render and redeploy/restart the backend if it caches the URL.
+
+---
+
+**Option C: Cloudflare Tunnel (free, stable hostname possible)**
+
+1. Install `cloudflared`:  
+   - [Download](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/) for your OS, or  
+   - macOS: `brew install cloudflared`  
+   - Linux: e.g. `wget ... && sudo dpkg -i cloudflared-*.deb` (see Cloudflare docs).
+2. **Quick tunnel (no Cloudflare account, URL changes each run):**  
+   `cloudflared tunnel --url http://localhost:7000`  
+   Use the printed `https://xxx.trycloudflare.com` URL as `MATCH_ENGINE_URL`. Update the backend when the URL changes.
+3. **Named tunnel (stable URL, needs Cloudflare account):**  
+   - Log in: `cloudflared tunnel login` (opens browser).  
+   - Create tunnel: `cloudflared tunnel create match-engine`.  
+   - Create a config file (e.g. `~/.cloudflared/config.yml`) with `ingress` pointing to `http://localhost:7000`.  
+   - Run: `cloudflared tunnel run match-engine`.  
+   - In Cloudflare Dashboard → **Zero Trust** → **Tunnels** → **Public Hostname**, add a hostname (e.g. `engine.yourdomain.com`) that routes to your tunnel.  
+   Use `https://engine.yourdomain.com` as `MATCH_ENGINE_URL`.
+
+---
+
+#### Step 6: Configure the backend (Render)
+
+1. In **Render** → your backend service → **Environment**.
+2. Set **`MATCH_ENGINE_URL`** to the URL you got from Step 5:  
+   - Port forwarding: `http://YOUR_PUBLIC_IP_OR_DDNS:7000`  
+   - ngrok: `https://xxxx.ngrok-free.app`  
+   - Cloudflare: `https://xxxx.trycloudflare.com` or `https://engine.yourdomain.com`
+3. **No trailing slash.** Use `http` or `https` to match what the engine is served over.
+4. Save and redeploy the backend so it picks up the new value.
+
+The backend will use this URL to call the match engine (e.g. provision match, cleanup, get infrastructure).
+
+---
+
+#### Step 7: Verify
+
+1. **Local:** With the engine running, open in a browser:  
+   `http://localhost:7000/engine/health`  
+   You should get a healthy response (e.g. 200 and a JSON body).
+2. **From the internet:** Use the **public** URL (the one you set as `MATCH_ENGINE_URL`):  
+   `https://your-ngrok-or-cloudflare-url/engine/health`  
+   Same response.
+3. **Backend:** Trigger an action that uses the engine (e.g. start a match). Check backend logs and engine logs (`pm2 logs match-engine` if using PM2) for errors.
+
+---
+
+#### Troubleshooting (own server)
+
+| Problem | What to check |
+|---------|----------------|
+| Engine won’t start | Docker running? (`docker ps`). Port 7000 free? (`netstat -an | findstr 7000` on Windows, `ss -tlnp | grep 7000` on Linux). |
+| Backend can’t reach engine | Is the **public** URL (ngrok/Cloudflare/port-forward) correct and without trailing slash? Can you open `PUBLIC_URL/engine/health` in a browser from another network (e.g. phone off Wi‑Fi)? |
+| “Docker not found” | Docker daemon must be running. On Windows, start Docker Desktop. On Linux, `sudo systemctl start docker`. |
+| ngrok URL changed | Update `MATCH_ENGINE_URL` in Render and redeploy the backend. |
+| Containers not created | Check engine logs; ensure `BACKEND_URL` is correct and the engine can reach the backend. Check Docker has enough resources (memory/disk). |
+
+---
+
+#### Full stack on one machine (optional)
+
+If you want **frontend + backend + match engine** all on the same PC or home server:
+
+- Run **backend** (e.g. `cd backend && npm start`), **match engine** (e.g. `cd match-engine && node src/engine.js` or PM2), and **frontend** (e.g. `cd frontend && npm run dev` or serve the built `dist/`).
+- Set backend **`MATCH_ENGINE_URL`** to `http://localhost:7000`.
+- Set frontend **`VITE_API_URL`** and **`VITE_SOCKET_URL`** to your backend URL (e.g. `http://localhost:3000`).
+- Set backend **`CORS_ORIGIN`** to the frontend origin (e.g. `http://localhost:5173` for Vite dev).
+- For **remote** players, expose frontend and backend (and optionally the engine) via port forwarding or a tunnel; then use the public URLs in the frontend env and CORS.
+
 ---
 
 ## 3. Frontend on Vercel
@@ -224,6 +484,6 @@ Use **Option B** URL as `MATCH_ENGINE_URL` in the backend.
 |---------|--------|------|
 | **Frontend** | Vercel | Root = `frontend`, build = `npm run build`, env = `VITE_*` and Firebase. |
 | **Backend** | Render | Root = `backend`, start = `npm start`, env = Firebase + `MATCH_ENGINE_URL` + `CORS_ORIGIN`. |
-| **Match Engine** | Free VPS (Oracle Cloud Always Free) | Node + Docker, `.env` with `BACKEND_URL` + `FLAG_SECRET`, run with `pm2 start src/engine.js`. |
+| **Match Engine** | Free VPS (Oracle Cloud Always Free) or **your own PC / home server** | Node + Docker, `.env` with `BACKEND_URL` + `FLAG_SECRET`, run with `pm2 start src/engine.js`. Use a tunnel (ngrok, Cloudflare) if the backend is in the cloud and your PC has no public IP. |
 
-The match engine **must** run on a host with Docker (VPS). Render only runs your Node app in a container; it does not give your app access to the Docker daemon to create match containers. **Oracle Cloud Always Free** gives you one or more VMs at no cost (no charges if you stay within Always Free limits).
+The match engine **must** run on a host with Docker (VPS or your own machine). Render only runs your Node app in a container; it does not give your app access to the Docker daemon to create match containers. **Oracle Cloud Always Free** gives you one or more VMs at no cost (no charges if you stay within Always Free limits). Alternatively, run the engine on **your own PC or home server** and expose it via port forwarding or a tunnel (see §2.6).
