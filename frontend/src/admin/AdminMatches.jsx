@@ -8,6 +8,8 @@ export default function AdminMatches() {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   const fetchMatches = () => {
     setLoading(true);
@@ -22,6 +24,28 @@ export default function AdminMatches() {
   useEffect(() => {
     fetchMatches();
   }, []);
+
+  const handleDeleteClick = (e, m) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setConfirmDelete(m);
+  };
+  const handleDeleteCancel = () => setConfirmDelete(null);
+  const handleDeleteConfirm = async () => {
+    if (!confirmDelete) return;
+    const matchId = confirmDelete.matchId;
+    setConfirmDelete(null);
+    setDeletingId(matchId);
+    setError('');
+    try {
+      await adminApi.deleteMatch(matchId);
+      await fetchMatches();
+    } catch (err) {
+      setError(err.message || err.data?.error || 'Failed to delete match');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (loading && matches.length === 0) {
     return (
@@ -108,12 +132,23 @@ export default function AdminMatches() {
                         {Array.isArray(m.teamB) ? m.teamB.length : 0} players
                       </td>
                       <td className="px-4 py-3">
-                        <Link
-                          to={`/admin/matches/${m.matchId}`}
-                          className="text-sm font-medium text-[var(--neon-red)] hover:underline"
-                        >
-                          View
-                        </Link>
+                        <div className="flex items-center gap-3">
+                          <Link
+                            to={`/admin/matches/${m.matchId}`}
+                            className="text-sm font-medium text-[var(--neon-cyan)] hover:text-[var(--neon-cyan)] hover:underline"
+                          >
+                            View
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteClick(e, m)}
+                            disabled={deletingId === m.matchId}
+                            className="px-2.5 py-1 rounded border border-[var(--border)] text-xs font-mono text-[var(--text-muted)] hover:border-[var(--neon-red)] hover:text-[var(--neon-red)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            title="Permanently delete match"
+                          >
+                            {deletingId === m.matchId ? 'Deleting…' : 'Delete'}
+                          </button>
+                        </div>
                       </td>
                     </motion.tr>
                   ))
@@ -123,6 +158,45 @@ export default function AdminMatches() {
           </div>
         </NeonCard>
       </motion.div>
+
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          onClick={handleDeleteCancel}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-match-title"
+        >
+          <div
+            className="bg-[var(--bg-secondary)] border border-[var(--neon-red)] rounded-xl p-6 max-w-md w-full shadow-xl shadow-[var(--neon-red)]/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="delete-match-title" className="font-heading text-lg font-semibold text-[var(--neon-red)] mb-2">
+              Delete match permanently?
+            </h2>
+            <p className="text-sm text-[var(--text-primary)] mb-2">
+              Engine cleanup (containers, network, state) and database record will be removed. This cannot be undone.
+            </p>
+            <p className="font-mono text-xs text-[var(--text-muted)] mb-4 break-all">{confirmDelete.matchId}</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={handleDeleteCancel}
+                className="px-4 py-2 rounded-lg border border-[var(--border)] text-sm font-mono text-[var(--text-muted)] hover:bg-[var(--bg-primary)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteConfirm}
+                className="px-4 py-2 rounded-lg border border-[var(--neon-red)] text-sm font-mono text-[var(--neon-red)] hover:bg-[var(--neon-red)]/10 transition-colors"
+              >
+                Delete permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

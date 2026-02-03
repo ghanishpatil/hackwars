@@ -2,15 +2,31 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { NeonCard } from '../components/NeonCard';
-import { joinMatch, onMatchState, offMatchState } from '../socket/socket';
+import { connectMatchSocket, disconnectMatchSocket, joinMatch, onMatchState, offMatchState } from '../socket/socket';
+import { auth } from '../firebase/config';
 
 export default function Match() {
   const { matchId } = useParams();
   const [matchState, setMatchState] = useState(null);
 
+  // Connect match socket only when on this page (not during login/signup)
   useEffect(() => {
     if (!matchId) return;
-    joinMatch(matchId);
+    let cancelled = false;
+    auth.currentUser?.getIdToken().then((token) => {
+      if (!cancelled) {
+        connectMatchSocket(token);
+        joinMatch(matchId);
+      }
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+      disconnectMatchSocket();
+    };
+  }, [matchId]);
+
+  useEffect(() => {
+    if (!matchId) return;
     const handler = (payload) => {
       if (payload.matchId === matchId) {
         setMatchState(payload.state);

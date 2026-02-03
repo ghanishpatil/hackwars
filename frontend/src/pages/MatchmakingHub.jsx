@@ -4,6 +4,8 @@ import { motion } from 'framer-motion';
 import { useAuth } from '../hooks/useAuth';
 import { api } from '../api/client';
 import {
+  connectMatchmakingSocket,
+  disconnectMatchmakingSocket,
   onChallengeReceived,
   offChallengeReceived,
   onChallengeAccepted,
@@ -11,8 +13,10 @@ import {
   onChallengeDeclined,
   offChallengeDeclined,
 } from '../socket/socket';
+import { auth } from '../firebase/config';
 import { NeonCard } from '../components/NeonCard';
 import { AnimatedButton } from '../components/AnimatedButton';
+import { MatchmakingSuccessAnimation } from '../components/MatchmakingSuccessAnimation';
 
 const DIFFICULTY_MAP = { beginner: 'easy', advanced: 'medium', expert: 'hard' };
 const DIFFICULTY_LABELS = { beginner: 'Beginner', advanced: 'Advanced', expert: 'Expert' };
@@ -34,6 +38,8 @@ export default function MatchmakingHub() {
   const [toast, setToast] = useState(null);
   const [profile, setProfile] = useState(null);
   const [team, setTeam] = useState(null);
+  const [showMatchFound, setShowMatchFound] = useState(false);
+  const [matchFoundData, setMatchFoundData] = useState(null);
 
   const difficultyValue = DIFFICULTY_MAP[difficulty] || 'medium';
 
@@ -80,13 +86,25 @@ export default function MatchmakingHub() {
   }, []);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
+  // Connect matchmaking socket only when on this page (not during login/signup)
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    auth.currentUser?.getIdToken().then((token) => {
+      if (!cancelled) connectMatchmakingSocket(token);
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+      disconnectMatchmakingSocket();
+    };
+  }, [user]);
   useEffect(() => {
     if (!user) return;
     const interval = setInterval(() => api.presence.heartbeat('matchmaking'), 30_000);
     api.presence.heartbeat('matchmaking').catch(() => {});
     return () => clearInterval(interval);
   }, [user]);
-  useEffect(() => { fetchOnline(); const id = setInterval(fetchOnline, 10_000); return () => clearInterval(id); }, [fetchOnline]);
+  useEffect(() => { fetchOnline(); const id = setInterval(fetchOnline, 30_000); return () => clearInterval(id); }, [fetchOnline]);
   useEffect(() => { fetchQueueStatus(); const id = setInterval(fetchQueueStatus, 5_000); return () => clearInterval(id); }, [fetchQueueStatus]);
   useEffect(() => {
     if (!queued) setQueueTimer(0);
@@ -132,7 +150,14 @@ export default function MatchmakingHub() {
     try {
       const res = await api.challenges.respond(challengeId, 'accept');
       setChallengeModal(null);
-      if (res.matchId) navigate(`/match/${res.matchId}`, { replace: true });
+      if (res.matchId) {
+        setMatchFoundData({ matchId: res.matchId });
+        setShowMatchFound(true);
+        // Navigate after animation and message (5 seconds)
+        setTimeout(() => {
+          navigate(`/match/${res.matchId}`, { replace: true });
+        }, 5000);
+      }
     } catch (err) {
       setToast({ type: 'error', message: err.message || 'Failed to accept' });
     }
@@ -148,8 +173,14 @@ export default function MatchmakingHub() {
   useEffect(() => {
     const onReceived = (payload) => setChallengeModal(payload);
     const onAccepted = (payload) => {
-      setToast({ type: 'success', message: 'Challenge accepted! Starting match...' });
-      if (payload.matchId) navigate(`/match/${payload.matchId}`, { replace: true });
+      if (payload.matchId) {
+        setMatchFoundData({ matchId: payload.matchId });
+        setShowMatchFound(true);
+        // Navigate after animation and message (5 seconds)
+        setTimeout(() => {
+          navigate(`/match/${payload.matchId}`, { replace: true });
+        }, 5000);
+      }
     };
     const onDeclined = (payload) => setToast({ type: 'info', message: payload.reason === 'expired' ? 'Challenge expired' : 'Challenge declined' });
     onChallengeReceived(onReceived);
@@ -287,19 +318,29 @@ export default function MatchmakingHub() {
           transition={{ delay: 0.1 }}
         >
           <NeonCard glow="red" className="p-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
               <h2 className="font-heading text-sm font-semibold text-[var(--text-primary)]">
                 {mode === 'solo' ? 'Online players' : 'Online teams'}
               </h2>
-              <select
-                value={mmrFilter}
-                onChange={(e) => setMmrFilter(e.target.value)}
-                className="rounded border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1 text-xs text-[var(--text-primary)]"
-              >
-                <option value="any">Any MMR</option>
-                <option value="±200">±200 MMR</option>
-                <option value="±500">±500 MMR</option>
-              </select>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchOnline()}
+                  disabled={loadingOnline}
+                  className="rounded border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1 text-xs font-mono text-[var(--text-muted)] hover:text-[var(--neon-cyan)] hover:border-[var(--neon-cyan)] disabled:opacity-50 transition-colors"
+                >
+                  {loadingOnline ? 'Refreshing…' : 'Refresh'}
+                </button>
+                <select
+                  value={mmrFilter}
+                  onChange={(e) => setMmrFilter(e.target.value)}
+                  className="rounded border border-[var(--border)] bg-[var(--bg-secondary)] px-2 py-1 text-xs text-[var(--text-primary)]"
+                >
+                  <option value="any">Any MMR</option>
+                  <option value="±200">±200 MMR</option>
+                  <option value="±500">±500 MMR</option>
+                </select>
+              </div>
             </div>
             {loadingOnline ? (
               <p className="font-mono text-xs text-[var(--text-muted)]">Loading...</p>
@@ -358,6 +399,28 @@ export default function MatchmakingHub() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Match Found Animation Overlay — blur is on the background (full screen), card stays sharp */}
+      {showMatchFound && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.6, ease: 'easeOut' }}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-xl"
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.15, ease: 'easeOut' }}
+            className="relative w-full max-w-2xl mx-4"
+          >
+            <NeonCard glow="cyan" className="p-8 md:p-12 bg-[var(--bg-primary)] border border-[var(--neon-cyan)]/40">
+              <MatchmakingSuccessAnimation message="Match found! Preparing your game..." />
+            </NeonCard>
+          </motion.div>
+        </motion.div>
       )}
 
       {/* Toast */}

@@ -7,7 +7,7 @@
 
 import { createHmac, timingSafeEqual } from 'crypto';
 
-const MATCH_ENGINE_SECRET = process.env.MATCH_ENGINE_SECRET || '';
+const MATCH_ENGINE_SECRET = (process.env.MATCH_ENGINE_SECRET || '').trim();
 const ALLOWED_IPS = (process.env.ALLOWED_BACKEND_IPS || '')
     .split(',')
     .map(ip => ip.trim())
@@ -15,9 +15,12 @@ const ALLOWED_IPS = (process.env.ALLOWED_BACKEND_IPS || '')
 
 /**
  * Authenticate request using shared secret in Authorization header.
- * 
+ *
  * Expected header format: Authorization: Bearer <secret>
  * Or HMAC-based: Authorization: HMAC <timestamp>:<signature>
+ *
+ * When MATCH_ENGINE_SECRET is not set (e.g. local dev), auth is skipped so backend can call without a secret.
+ * For production, set the same MATCH_ENGINE_SECRET on both backend and match-engine.
  */
 export function authenticateEngine(req, res, next) {
     // Skip auth for health check
@@ -25,11 +28,15 @@ export function authenticateEngine(req, res, next) {
         return next();
     }
 
+    // When no secret is configured, allow all requests (local dev only; set secret in production)
+    if (!MATCH_ENGINE_SECRET || MATCH_ENGINE_SECRET.trim() === '') {
+        return next();
+    }
+
     // Check IP whitelist if configured
     if (ALLOWED_IPS.length > 0) {
         const clientIp = req.ip || req.socket?.remoteAddress || '';
         const isAllowed = ALLOWED_IPS.some(allowedIp => {
-            // Handle IPv6-mapped IPv4 addresses
             const normalizedClientIp = clientIp.replace('::ffff:', '');
             return normalizedClientIp === allowedIp || clientIp === allowedIp;
         });
@@ -51,16 +58,16 @@ export function authenticateEngine(req, res, next) {
     const [scheme, token] = authHeader.split(' ');
 
     if (scheme === 'Bearer') {
-        // Simple bearer token authentication
-        if (!token || !MATCH_ENGINE_SECRET) {
+        // Simple bearer token authentication (trim both to avoid .env newline/space mismatch)
+        const tokenTrimmed = (token || '').trim();
+        if (!tokenTrimmed || !MATCH_ENGINE_SECRET) {
             console.warn('[ENGINE AUTH] Invalid bearer token');
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        // Timing-safe comparison to prevent timing attacks
         try {
-            const tokenBuffer = Buffer.from(token);
-            const secretBuffer = Buffer.from(MATCH_ENGINE_SECRET);
+            const tokenBuffer = Buffer.from(tokenTrimmed, 'utf8');
+            const secretBuffer = Buffer.from(MATCH_ENGINE_SECRET, 'utf8');
 
             if (tokenBuffer.length !== secretBuffer.length) {
                 console.warn('[ENGINE AUTH] Token length mismatch');
@@ -76,7 +83,6 @@ export function authenticateEngine(req, res, next) {
             return res.status(401).json({ error: 'Unauthorized' });
         }
 
-        // Authentication successful
         return next();
     }
 

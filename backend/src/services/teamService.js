@@ -10,6 +10,7 @@ import { getFirestore } from '../firebase/firebaseAdmin.js';
 
 const USERS_COLLECTION = 'users';
 const TEAMS_COLLECTION = 'teams';
+const TEAM_EVENTS_COLLECTION = 'team_events';
 
 const INVITE_CODE_LENGTH = 6;
 const ALPHANUM = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -40,6 +41,46 @@ async function getUserProfile(firestore, uid) {
     username: d.username ?? d.displayName ?? '',
     mmr: typeof d.mmr === 'number' ? d.mmr : 1000,
     rank: d.rank ?? 'Initiate',
+  };
+}
+
+/**
+ * Append an immutable team event for audit/history (used by admin user-activity view).
+ * Note: this records history going forward; it cannot reconstruct events that were never stored.
+ */
+async function logTeamEvent(firestore, { uid, action, teamId, teamName, teamSnapshot = null, metadata = {} }) {
+  try {
+    await firestore.collection(TEAM_EVENTS_COLLECTION).add({
+      uid,
+      action, // team_create | team_join | team_leave | team_disband | team_leader_transfer
+      teamId: teamId || null,
+      teamName: teamName || null,
+      teamSnapshot,
+      metadata,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    // Never block core team ops on history writes.
+    console.warn('[team_events] Failed to write team event:', err.message);
+  }
+}
+
+function buildTeamSnapshot(teamId, teamData) {
+  if (!teamData) return null;
+  const members = Array.isArray(teamData.members) ? teamData.members : [];
+  return {
+    teamId,
+    name: teamData.name ?? null,
+    leaderId: teamData.leaderId ?? null,
+    currentSize: typeof teamData.currentSize === 'number' ? teamData.currentSize : members.length,
+    maxSize: typeof teamData.maxSize === 'number' ? teamData.maxSize : null,
+    inviteCode: teamData.inviteCode ?? null,
+    members: members.map((m) => ({
+      uid: m.uid,
+      username: m.username ?? '',
+      mmr: m.mmr ?? 1000,
+      joinedAt: m.joinedAt?.toMillis?.() ?? m.joinedAt ?? null,
+    })),
   };
 }
 
@@ -94,6 +135,14 @@ export async function createTeam(uid, { teamName, maxSize }) {
   });
 
   const teamSnap = await teamRef.get();
+  const teamDataFinal = teamSnap.data();
+  await logTeamEvent(firestore, {
+    uid,
+    action: 'team_create',
+    teamId: teamRef.id,
+    teamName: name,
+    teamSnapshot: buildTeamSnapshot(teamRef.id, teamDataFinal),
+  });
   return { id: teamRef.id, ...teamSnap.data() };
 }
 
@@ -142,6 +191,13 @@ export async function joinTeam(uid, { inviteCode }) {
   });
 
   const updated = await teamRef.get();
+  await logTeamEvent(firestore, {
+    uid,
+    action: 'team_join',
+    teamId: teamRef.id,
+    teamName: updated.data()?.name ?? teamData.name ?? null,
+    teamSnapshot: buildTeamSnapshot(teamRef.id, updated.data()),
+  });
   return { id: teamRef.id, ...updated.data() };
 }
 
@@ -160,6 +216,7 @@ export async function leaveTeam(uid) {
   const teamSnap = await teamRef.get();
   if (!teamSnap.exists) {
     await firestore.collection(USERS_COLLECTION).doc(uid).update({ currentTeamId: admin.firestore.FieldValue.delete() });
+    await logTeamEvent(firestore, { uid, action: 'team_leave', teamId, teamName: null, teamSnapshot: null });
     return { left: true };
   }
 
@@ -170,6 +227,14 @@ export async function leaveTeam(uid) {
     await firestore.runTransaction(async (tx) => {
       tx.update(teamRef, { isActive: false, members: [], currentSize: 0 });
       tx.update(firestore.collection(USERS_COLLECTION).doc(uid), { currentTeamId: admin.firestore.FieldValue.delete() });
+    });
+    await logTeamEvent(firestore, {
+      uid,
+      action: 'team_disband',
+      teamId,
+      teamName: data.name ?? null,
+      teamSnapshot: buildTeamSnapshot(teamId, { ...data, members: [], currentSize: 0, isActive: false }),
+      metadata: { reason: 'last_member_left' },
     });
     return { left: true };
   }
@@ -195,6 +260,24 @@ export async function leaveTeam(uid) {
     tx.update(firestore.collection(USERS_COLLECTION).doc(uid), { currentTeamId: admin.firestore.FieldValue.delete() });
   });
 
+  await logTeamEvent(firestore, {
+    uid,
+    action: 'team_leave',
+    teamId,
+    teamName: data.name ?? null,
+    teamSnapshot: buildTeamSnapshot(teamId, { ...data, members, currentSize: members.length, leaderId: newLeaderId, averageMMR }),
+    metadata: { wasLeader: isLeader, newLeaderId: isLeader ? newLeaderId : null },
+  });
+  if (isLeader) {
+    await logTeamEvent(firestore, {
+      uid: newLeaderId,
+      action: 'team_leader_transfer',
+      teamId,
+      teamName: data.name ?? null,
+      teamSnapshot: buildTeamSnapshot(teamId, { ...data, members, currentSize: members.length, leaderId: newLeaderId, averageMMR }),
+      metadata: { previousLeaderId: uid },
+    });
+  }
   return { left: true };
 }
 
@@ -218,6 +301,20 @@ export async function disbandTeam(uid, teamId) {
     batch.update(firestore.collection(USERS_COLLECTION).doc(m.uid), { currentTeamId: admin.firestore.FieldValue.delete() });
   });
   await batch.commit();
+
+  // Record disband for all members (including leader) for history.
+  await Promise.all(
+    members.map((m) =>
+      logTeamEvent(firestore, {
+        uid: m.uid,
+        action: 'team_disband',
+        teamId,
+        teamName: data.name ?? null,
+        teamSnapshot: buildTeamSnapshot(teamId, { ...data, members: [], currentSize: 0, isActive: false }),
+        metadata: { disbandedBy: uid },
+      })
+    )
+  );
   return { disbanded: true };
 }
 

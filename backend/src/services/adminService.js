@@ -5,12 +5,13 @@
 
 import admin from 'firebase-admin';
 import { getFirestore, getAuth } from '../firebase/firebaseAdmin.js';
-import { getMatchStatus, getMatchResult, getEngineHealth, stopMatch } from './engineClient.js';
+import { getMatchStatus, getMatchResult, getEngineHealth, stopMatch, cleanupMatch } from './engineClient.js';
 
 const USERS_COLLECTION = 'users';
 const MATCHES_COLLECTION = 'matches';
 const QUEUES_COLLECTION = 'queues';
 const ADMIN_EVENTS_COLLECTION = 'admin_events';
+const TEAM_EVENTS_COLLECTION = 'team_events';
 const SYSTEM_CONFIG_COLLECTION = 'system_config';
 
 /**
@@ -162,6 +163,32 @@ export async function markMatchInvalid(adminId, matchId) {
 }
 
 /**
+ * POST /admin/match/:id/delete: permanently erase match (engine cleanup + Firestore delete, no trace).
+ *
+ * @param {string} adminId
+ * @param {string} matchId
+ */
+export async function deleteMatchAdmin(adminId, matchId) {
+  const firestore = getFirestore();
+  if (!firestore) throw new Error('Firestore not initialized');
+
+  const matchRef = firestore.collection(MATCHES_COLLECTION).doc(matchId);
+  const matchSnap = await matchRef.get();
+  if (!matchSnap.exists) {
+    return; // already gone
+  }
+
+  try {
+    await cleanupMatch(matchId);
+  } catch (err) {
+    console.warn(`[admin] Engine cleanup for match ${matchId} failed (continuing DB delete):`, err.message);
+  }
+
+  await matchRef.delete();
+  await audit(firestore, adminId, 'match_delete', matchId, {});
+}
+
+/**
  * Compute real-time status for a user: BANNED | IN_MATCH | IN_QUEUE | ACTIVE.
  *
  * @param {string} uid
@@ -301,11 +328,13 @@ export async function getUserActivity(adminId, uid) {
   const firestore = getFirestore();
   if (!firestore) throw new Error('Firestore not initialized');
 
-  const [userSnap, matchesSnap, eventsSnap] = await Promise.all([
+  const [userSnap, matchesSnap, eventsSnap, teamEventsSnap] = await Promise.all([
     firestore.collection(USERS_COLLECTION).doc(uid).get(),
     firestore.collection(MATCHES_COLLECTION).orderBy('createdAt', 'desc').limit(100).get(),
     // No orderBy to avoid composite index; we sort in memory
     firestore.collection(ADMIN_EVENTS_COLLECTION).where('target', '==', uid).limit(100).get(),
+    // Team history: written by teamService (join/leave/disband). No orderBy; sort in memory.
+    firestore.collection(TEAM_EVENTS_COLLECTION).where('uid', '==', uid).limit(200).get(),
   ]);
 
   if (!userSnap.exists) return null;
@@ -344,6 +373,53 @@ export async function getUserActivity(adminId, uid) {
 
   const loginHistory = Array.isArray(d.loginHistory) ? d.loginHistory.filter((ts) => typeof ts === 'number') : [];
 
+  // Team history (most recent first)
+  const teamEventsRaw = teamEventsSnap.docs.map((doc) => {
+    const data = doc.data();
+    const ts = data.createdAt?.toMillis?.() ?? data.createdAt ?? 0;
+    return {
+      id: doc.id,
+      action: data.action,
+      teamId: data.teamId || null,
+      teamName: data.teamName || null,
+      teamSnapshot: data.teamSnapshot || null,
+      metadata: data.metadata || {},
+      createdAt: ts || null,
+    };
+  });
+  teamEventsRaw.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const teamHistory = teamEventsRaw.slice(0, 100);
+
+  // Current team snapshot (if any)
+  let currentTeam = null;
+  if (d.currentTeamId) {
+    try {
+      const teamSnap = await firestore.collection('teams').doc(d.currentTeamId).get();
+      if (teamSnap.exists) {
+        const td = teamSnap.data();
+        currentTeam = {
+          id: teamSnap.id,
+          name: td.name ?? null,
+          leaderId: td.leaderId ?? null,
+          currentSize: td.currentSize ?? (Array.isArray(td.members) ? td.members.length : 0),
+          maxSize: td.maxSize ?? null,
+          averageMMR: td.averageMMR ?? null,
+          isActive: td.isActive === true,
+          members: Array.isArray(td.members)
+            ? td.members.map((m) => ({
+                uid: m.uid,
+                username: m.username ?? '',
+                mmr: m.mmr ?? 1000,
+                joinedAt: m.joinedAt?.toMillis?.() ?? m.joinedAt ?? null,
+              }))
+            : [],
+        };
+      }
+    } catch {
+      currentTeam = null;
+    }
+  }
+
   return {
     uid,
     displayName: d.displayName ?? '',
@@ -353,6 +429,8 @@ export async function getUserActivity(adminId, uid) {
     loginHistory,
     recentMatches,
     recentAdminEvents,
+    currentTeam,
+    teamHistory,
   };
 }
 

@@ -33,8 +33,8 @@ async function request(method, path, body, options = {}) {
       'Content-Type': 'application/json',
     };
 
-    // Add authentication header if secret is configured
-    const secret = process.env.MATCH_ENGINE_SECRET;
+    // Add authentication header if secret is configured (trim to avoid .env newline/space mismatch)
+    const secret = process.env.MATCH_ENGINE_SECRET?.trim();
     if (secret) {
       headers['Authorization'] = `Bearer ${secret}`;
     }

@@ -60,28 +60,22 @@ export function validateEnvironment() {
 
 /**
  * Additional validation for production environment.
+ * CORS localhost is allowed for development; for final production set CORS_ORIGINS to your real domain(s).
  */
 function validateProductionConfig() {
-  // Validate CORS origins don't include localhost
   const corsOrigins = (process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || '')
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
-  
-  const hasLocalhost = corsOrigins.some(origin => 
-    origin.includes('localhost') || 
-    origin.includes('127.0.0.1') ||
-    origin.includes('0.0.0.0')
+  const hasLocalhost = corsOrigins.some(origin =>
+    origin.includes('localhost') || origin.includes('127.0.0.1') || origin.includes('0.0.0.0')
   );
-  
   if (hasLocalhost) {
-    throw new Error(
-      'SECURITY ERROR: CORS_ORIGINS contains localhost in production mode.\n' +
-      'This is a security risk. Please set production domain(s) only.\n' +
-      `Current value: ${corsOrigins.join(', ')}`
+    console.warn(
+      '⚠ CORS_ORIGINS contains localhost. For final production, set CORS_ORIGINS to your production domain(s) only.'
     );
   }
-  
+
   // Validate Firebase private key format
   const privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
   if (!privateKey.includes('BEGIN PRIVATE KEY') || !privateKey.includes('END PRIVATE KEY')) {

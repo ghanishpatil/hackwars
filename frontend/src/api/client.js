@@ -87,6 +87,7 @@ export const adminApi = {
   getMatch: (id) => request(`/admin/match/${id}`),
   stopMatch: (id) => request(`/admin/match/${id}/stop`, { method: 'POST' }),
   markMatchInvalid: (id) => request(`/admin/match/${id}/invalid`, { method: 'POST' }),
+  deleteMatch: (id) => request(`/admin/match/${id}/delete`, { method: 'POST' }),
   getPlayers: () => request('/admin/players'),
   getUser: (uid) => request(`/admin/user/${uid}`),
   getUserActivity: (uid) => request(`/admin/user/${uid}/activity`),

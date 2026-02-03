@@ -31,6 +31,17 @@ function formatTs(ts) {
   }
 }
 
+function actionLabel(action) {
+  switch (action) {
+    case 'team_create': return 'Created team';
+    case 'team_join': return 'Joined team';
+    case 'team_leave': return 'Left team';
+    case 'team_disband': return 'Team disbanded';
+    case 'team_leader_transfer': return 'Became team leader';
+    default: return String(action || 'event');
+  }
+}
+
 export default function AdminUserActivity() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -276,7 +287,7 @@ export default function AdminUserActivity() {
 
             {detail && !detailLoading && (
               <div className="space-y-6 font-mono text-sm">
-                <div className="grid grid-cols-2 gap-4 p-3 rounded bg-[var(--bg-secondary)]">
+                <div className="grid grid-cols-2 gap-4 p-3 rounded bg-[var(--bg-secondary)] border border-[var(--border)]">
                   <div>
                     <p className="text-[var(--text-muted)] text-xs uppercase">Last login</p>
                     <p className="text-[var(--text-primary)]">{formatTs(detail.lastLogin)}</p>
@@ -284,6 +295,67 @@ export default function AdminUserActivity() {
                   <div>
                     <p className="text-[var(--text-muted)] text-xs uppercase">Last active</p>
                     <p className="text-[var(--text-primary)]">{formatTs(detail.lastActive)}</p>
+                  </div>
+                </div>
+
+                {/* Team snapshot + team history */}
+                <div>
+                  <h4 className="font-heading text-sm font-semibold text-[var(--neon-amber)] mb-2">Teams</h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-3 rounded bg-[var(--bg-secondary)] border border-[var(--border)]">
+                      <p className="text-[var(--text-muted)] text-xs uppercase mb-2">Current team</p>
+                      {detail.currentTeam ? (
+                        <div className="space-y-1">
+                          <p className="text-[var(--text-primary)] font-semibold">{detail.currentTeam.name || detail.currentTeam.id}</p>
+                          <p className="text-xs text-[var(--text-muted)]">
+                            {detail.currentTeam.currentSize}/{detail.currentTeam.maxSize || '—'} members
+                            {detail.currentTeam.leaderId ? ` · leader: ${String(detail.currentTeam.leaderId).slice(0, 8)}…` : ''}
+                          </p>
+                          {Array.isArray(detail.currentTeam.members) && detail.currentTeam.members.length > 0 && (
+                            <ul className="mt-2 space-y-1 text-xs">
+                              {detail.currentTeam.members.slice(0, 6).map((m) => (
+                                <li key={m.uid} className="flex items-center justify-between gap-2">
+                                  <span className="text-[var(--text-primary)] truncate">{m.username || m.uid}</span>
+                                  <span className="text-[var(--text-muted)] shrink-0">{m.mmr ?? '—'} MMR</span>
+                                </li>
+                              ))}
+                              {detail.currentTeam.members.length > 6 && (
+                                <li className="text-[var(--text-dim)]">+{detail.currentTeam.members.length - 6} more…</li>
+                              )}
+                            </ul>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-[var(--text-muted)]">Not in a team</p>
+                      )}
+                    </div>
+
+                    <div className="p-3 rounded bg-[var(--bg-secondary)] border border-[var(--border)]">
+                      <p className="text-[var(--text-muted)] text-xs uppercase mb-2">Team history</p>
+                      {detail.teamHistory?.length ? (
+                        <ul className="space-y-2 text-xs">
+                          {detail.teamHistory.slice(0, 20).map((e) => (
+                            <li key={e.id || `${e.action}-${e.createdAt}`} className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="text-[var(--text-primary)]">
+                                  <span className="text-[var(--neon-amber)] font-semibold">{actionLabel(e.action)}</span>
+                                  {e.teamName ? ` · ${e.teamName}` : e.teamId ? ` · ${e.teamId}` : ''}
+                                </p>
+                                {e.metadata?.wasLeader && e.metadata?.newLeaderId && (
+                                  <p className="text-[var(--text-dim)]">Leader transferred to {String(e.metadata.newLeaderId).slice(0, 8)}…</p>
+                                )}
+                              </div>
+                              <span className="text-[var(--text-muted)] shrink-0">{formatTs(e.createdAt)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-[var(--text-muted)]">
+                          No team history recorded yet. (Team join/leave events are tracked going forward.)
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
 

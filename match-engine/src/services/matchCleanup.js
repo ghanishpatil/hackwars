@@ -8,7 +8,7 @@
 import { getDockerClient } from '../docker/dockerClient.js';
 import { removeMatchNetwork } from '../docker/networkManager.js';
 import { stopAndRemoveContainer } from '../docker/containerManager.js';
-import { getMatchInfrastructure, deleteMatchInfrastructure } from '../state/stateStore.js';
+import { getMatchInfrastructure, deleteMatchInfrastructure, deleteMatch } from '../state/stateStore.js';
 
 const CONTAINER_STOP_TIMEOUT_MS = 30_000;
 const STALE_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -23,6 +23,7 @@ export async function cleanupMatch(matchId) {
   if (!infrastructure) {
     await removeMatchNetwork(matchId);
     deleteMatchInfrastructure(matchId);
+    deleteMatch(matchId);
     return;
   }
 
@@ -46,7 +47,8 @@ export async function cleanupMatch(matchId) {
 
   await removeMatchNetwork(matchId);
   deleteMatchInfrastructure(matchId);
-  console.log(`[CLEANUP] Match ${matchId} cleaned up`);
+  deleteMatch(matchId);
+  console.log(`[CLEANUP] Match ${matchId} cleaned up (no trace)`);
 }
 
 /**

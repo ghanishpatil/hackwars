@@ -10,6 +10,7 @@ import {
   getMatchDetail,
   stopMatchAdmin,
   markMatchInvalid,
+  deleteMatchAdmin,
   getPlayers,
   getUserProfile,
   getUserActivity,
@@ -131,6 +132,18 @@ router.post('/match/:id/invalid', async (req, res) => {
   } catch (err) {
     console.error('Admin match invalid error:', err);
     return res.status(500).json({ error: 'Failed to mark match invalid' });
+  }
+});
+
+/** POST /admin/match/:id/delete — permanently erase match (engine + DB, no trace) */
+router.post('/match/:id/delete', async (req, res) => {
+  try {
+    const adminId = req.user?.uid;
+    await deleteMatchAdmin(adminId, req.params.id);
+    return res.json({ status: 'deleted' });
+  } catch (err) {
+    console.error('Admin match delete error:', err);
+    return res.status(500).json({ error: 'Failed to delete match' });
   }
 });
 

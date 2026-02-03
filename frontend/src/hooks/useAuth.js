@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut as fbSignOut } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { setApiToken, clearApiToken, api } from '../api/client';
-import { connectMatchSocket, disconnectMatchSocket, connectMatchmakingSocket, disconnectMatchmakingSocket } from '../socket/socket';
 
 /**
  * Auth state: role comes from DB (GET /auth/me), not from token claims.
@@ -23,16 +22,12 @@ export function useAuth() {
         setUser(null);
         setIsAdmin(false);
         clearApiToken();
-        disconnectMatchSocket();
-        disconnectMatchmakingSocket();
         setBannedMessage((prev) => prev);
         setLoading(false);
         return;
       }
       const idToken = await fbUser.getIdToken();
       setApiToken(idToken);
-      connectMatchSocket(idToken);
-      connectMatchmakingSocket(idToken);
       try {
         const profile = await api.getMe();
         setBannedMessage(null);
@@ -59,8 +54,6 @@ export function useAuth() {
           setUser(null);
           setIsAdmin(false);
           clearApiToken();
-          disconnectMatchSocket();
-          disconnectMatchmakingSocket();
         } else {
           setUser({ uid: fbUser.uid, email: fbUser.email ?? null });
           setIsAdmin(false);
@@ -83,8 +76,6 @@ export function useAuth() {
   const signOut = async () => {
     await fbSignOut(auth);
     clearApiToken();
-    disconnectMatchSocket();
-    disconnectMatchmakingSocket();
   };
 
   return { user, isAdmin, loading, bannedMessage, clearBannedMessage, signIn, signUp, signOut, auth };
